@@ -3,54 +3,111 @@ import time
 from pyqtgraph.Qt import QtCore, QtWidgets
 import numpy as np
 import pyqtgraph as pg
+from datetime import datetime
+import os
+import csv
+from collections import deque
+
+# C:\Users\lhcub\anaconda3\envs\newdelsys\Lib\site-packages\qt5_applications\Qt\bin\designer.exe
+from QT.main_window import Ui_MainWindow
 
 
-class App(QtWidgets.QMainWindow):
+class App(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(App, self).__init__(parent)
-
-        #### Create Gui Elements ###########
-        self.mainbox = QtWidgets.QWidget()
-        self.setCentralWidget(self.mainbox)
-        self.mainbox.setLayout(QtWidgets.QVBoxLayout())
+        self.setupUi(self)
 
         self.canvas = pg.GraphicsLayoutWidget()
-        self.mainbox.layout().addWidget(self.canvas)
-
-        self.label = QtWidgets.QLabel()
-        self.mainbox.layout().addWidget(self.label)
-
+        self.canvas_layout.addWidget(self.canvas)
+        self.browse_btn.clicked.connect(self.choose_folder)
+        self.data_start_btn.clicked.connect(self.start_collection)
+        self.channel_combo.currentIndexChanged.connect(self.change_channel)
+        self.aux_sync_btn.clicked.connect(self.sync_signal)
         #  line plot
         self.live_plot_itm = self.canvas.addPlot()
         self.live_plot = self.live_plot_itm.plot(pen="y")
+        self.live_plot_itm.setLabel("bottom", "Time", "s")
 
         self.freeze_plot_itm = self.canvas.addPlot()
         self.freeze_plot = self.freeze_plot_itm.plot(pen="y")
+        self.freeze_plot_itm.setLabel("bottom", "Time", "ms")
 
         #### Set Data  #####################
+        # TODO: figure out a fixed time frame, and transform to seconds
         self.data_len = 10000
-        self.new_data_len = 20
-        self.x = np.linspace(0, self.data_len - 1, self.data_len) * 0.01
-        self.y = np.full([self.data_len], np.nan)
+        self.frozen_data_len = 100
+        self.frozen_data = deque(maxlen=self.frozen_data_len)
+        # FIXME: figure out the sample time steps
+        self.frozen_x = (
+            np.linspace(0, self.frozen_data_len - 1, self.frozen_data_len)
+            * 0.001
+            * 1000
+        )  # ms
+        self.x = np.linspace(0, self.data_len - 1, self.data_len) * 0.001
+        self.y_plot = np.full([self.data_len, 2], np.nan)
+        self.is_saving_data = False
+        self.saving_data_path = None
+        self.file = None
         self.idx = 0
+        self.selected_channel = 0
 
         self.counter = 0
         self.fps = 0.0
         self.initial_time = time.time()
         self.last_update = time.time()
 
+    def choose_folder(self):
+        dialog = QtWidgets.QFileDialog()
+        folder_path = dialog.getExistingDirectory(None, "Select Folder")
+        self.folder_in.setText(folder_path)
+
+    def sync_signal(self):
+        frozen_values = np.array(self.frozen_data.copy())
+        self.freeze_plot.setData(self.frozen_x, frozen_values[:, self.selected_channel])
+
+    def start_collection(self):
+        if not self.is_saving_data:
+            now = datetime.now()
+            self.saving_data_path = f"{self.folder_in.text()}/{self.pat_code_in.text()}_{self.side_combo.currentText()}_{now.strftime('%Y%m%d_%H%M%S')}.csv"
+            os.makedirs(os.path.dirname(self.saving_data_path), exist_ok=True)
+            self.file = open(self.saving_data_path, "w+", newline="")
+            self.writer = csv.writer(self.file)
+            self.writer.writerow(["chan_1", "chan_2"])
+            # self.file.write("timestamp,chan_1,chan_2\n")
+            self.is_saving_data = True
+
+            # Change color and text of button
+            self.data_start_btn.setStyleSheet("background-color : yellow")
+            self.data_start_btn.setText("Stop collection")
+        else:
+            self.file.close()
+            self.is_saving_data = False
+            self.data_start_btn.setStyleSheet("background-color : green")
+            self.data_start_btn.setText("Start saving data")
+
+    def change_channel(self, new_channel):
+        self.selected_channel = new_channel
+
     def _update_data(self):
         new_data_len = 5
-        new_data = np.random.random(new_data_len) - 0.5
+        new_data = np.random.random((new_data_len, 2)) - 0.5
         if self.idx + new_data_len >= self.data_len:
             self.idx = 0
-            self.y = np.full([self.data_len], np.nan)
-        self.y[self.idx : self.idx + new_data_len] = new_data
+            self.y_plot = np.full([self.data_len, 2], np.nan)
+        self.y_plot[self.idx : self.idx + new_data_len, :] = new_data
+        # TODO: maybe not necessary to keep all the data in memory
+        # self.data.extend(new_data.tolist())
+        self.frozen_data.extend(new_data.tolist())
         self.idx += new_data_len + 1
+        # TODO: figure out timestamps
+        # Save if necessary
+        # TODO: check if it is necessary to only save at the end
+        if self.is_saving_data:
+            self.writer.writerows(new_data.tolist())
 
     def _update_plot(self):
         # self.img.setImage(self.data)
-        self.live_plot.setData(self.x, self.y)
+        self.live_plot.setData(self.x, self.y_plot[:, self.selected_channel])
 
         now = time.time()
         dt = now - self.last_update
@@ -60,7 +117,7 @@ class App(QtWidgets.QMainWindow):
         self.last_update = now
         self.fps = self.fps * 0.9 + fps2 * 0.1
         tx = "Mean Frame Rate:  {fps:.3f} FPS".format(fps=self.fps)
-        self.label.setText(tx)
+        self.fps_label.setText(tx)
         # QtCore.QTimer.singleShot(1, self._update)
         self.counter += 1
 
