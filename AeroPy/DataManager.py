@@ -3,6 +3,18 @@ This is the class that handles the data that is output from the Delsys Trigno Ba
 Create an instance of this and pass it a reference to the Trigno base for initialization
 """
 import numpy as np
+import functools
+import time
+def timer(func):
+    @functools.wraps(func)
+    def wrapper_timer(*args, **kwargs):
+        tic = time.perf_counter()
+        value = func(*args, **kwargs)
+        toc = time.perf_counter()
+        elapsed_time = toc - tic
+        print(f"Elapsed time: {elapsed_time:0.6f} seconds")
+        return value
+    return wrapper_timer
 
 class DataKernel():
     def __init__(self,trigno_base):
@@ -15,7 +27,7 @@ class DataKernel():
         outArr = self.GetData()
         if outArr is not None:
             for i in range(len(outArr[0])):
-                data_queue.append(list(np.asarray(outArr)[:, i]))
+                data_queue.append(list(np.asarray(outArr, dtype=object)[:, i]))
             try:
                 self.packetCount += len(outArr[0])
                 self.sampleCount += len(outArr[0][0])
