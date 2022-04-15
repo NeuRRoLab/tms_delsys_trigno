@@ -36,7 +36,7 @@ def timer(func):
         value = func(*args, **kwargs)
         toc = time.perf_counter()
         elapsed_time = toc - tic
-        # print(f"Elapsed time: {elapsed_time:0.6f} seconds")
+        print(f"Elapsed time: {elapsed_time:0.6f} seconds")
         return value
     return wrapper_timer
 
@@ -61,7 +61,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.live_plot = self.live_plot_itm.plot(pen="y")
         self.live_plot_itm.setLabel("bottom", "Time", "s")
         self.live_plot_itm.setLabel("left", "Voltage", "V")
-        self.live_plot_itm.setYRange(-0.0015, 0.0015, padding=0)
+        self.live_plot_itm.setYRange(-0.003, 0.003, padding=0)
         self.live_plot_itm.showGrid(x = True, y = True)
 
         self.freeze_plot_itm = self.canvas.addPlot()
@@ -70,10 +70,12 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.freeze_plot_itm.showGrid(x = True, y = True)
         self.freeze_plot_itm.setLabel("left", "Voltage", "V")
 
+        self.ppvoltage_label.setText(f"0.0")
+
         #### Set Data  #####################
-        # TODO: figure out a fixed time frame, and transform to seconds
-        self.emg_sample_rate = 1926
-        self.data_len = self.emg_sample_rate * 10
+        # FIXME: not sure about this sample rate
+        self.emg_sample_rate = 1925.9259033203125
+        self.data_len = int(round(self.emg_sample_rate * 10))
         self.frozen_data_len = int(round(self.emg_sample_rate / 10))
         self.frozen_data = deque(maxlen=self.frozen_data_len)
         # FIXME: figure out the sample time steps
@@ -83,7 +85,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
             * 1000
         )  # ms
         self.x = np.linspace(0, self.data_len - 1, self.data_len) / self.emg_sample_rate
-        self.y_plot = np.full([self.data_len, 2], np.nan)
+        self.y_plot = np.full([self.data_len, 3], np.nan)
         self.is_saving_data = False
         self.saving_data_path = None
         self.file = None
@@ -98,8 +100,13 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         # Configure Delsys
         self.sensors_found = 0
         self.started_streaming = False
+        self.pauseFlag = False
+        self.stim_ts = 0
+        self.stim_collecting_data = False
         t1 = threading.Thread(target=self.initialize_delsys)
         t1.start()
+        t2 = threading.Thread(target=self.collect_stim_data)
+        t2.start()
     
     def initialize_delsys(self):
         self.connect()
@@ -115,8 +122,9 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def sync_signal(self):
         frozen_values = np.array(self.frozen_data.copy())
-        print(np.min(frozen_values))
         self.freeze_plot.setData(self.frozen_x, frozen_values[:, self.selected_channel])
+        ppvoltage = np.max(frozen_values[:, self.selected_channel]) - np.min(frozen_values[:, self.selected_channel]) * 1E6
+        self.ppvoltage_label.setText(f"{ppvoltage:.1f}")
 
     def start_collection(self):
         if not self.is_saving_data:
@@ -125,7 +133,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
             os.makedirs(os.path.dirname(self.saving_data_path), exist_ok=True)
             self.file = open(self.saving_data_path, "w+", newline="")
             self.writer = csv.writer(self.file)
-            self.writer.writerow(["chan_1", "chan_2"])
+            self.writer.writerow(["chan_1", "chan_2", "stim"])
             # self.file.write("timestamp,chan_1,chan_2\n")
             self.is_saving_data = True
 
@@ -156,7 +164,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
     def streaming(self):
         """This is the data processing thread"""
         self.emg_queue = deque()
-        while self.pauseFlag is False:
+        while not self.pauseFlag:
             val = self.DataHandler.processData(self.emg_queue)
             if len(self.emg_queue) > 0:
                 self.process_new_data(self.emg_queue.popleft())
@@ -165,7 +173,6 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         print(self.DataHandler.getPacketCount())
     
     def start_stream(self):
-        self.pauseFlag = False
         newTransform = self.base.CreateTransform("raw")
         index = List[Int32]()
 
@@ -190,7 +197,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
                         selectedSensor.TrignoChannels[channel].Name,
                     )
                 )
-                if "EMG" in selectedSensor.TrignoChannels[channel].Name:
+                if "EMG" in selectedSensor.TrignoChannels[channel].Name or "Analog A" in selectedSensor.TrignoChannels[channel].Name:
                     self.dataStreamIdx.append(idxVal)
                 idxVal += 1
         print(self.dataStreamIdx)
@@ -202,6 +209,13 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
     def stop_stream(self):
         self.base.StopData()
         self.pauseFlag = True
+    
+    def collect_stim_data(self):
+        while not self.pauseFlag:
+            if self.stim_collecting_data and (time.time() - self.stim_ts >= 0.1):
+                self.sync_signal()
+                self.stim_collecting_data = False
+            time.sleep(0.001)
 
     def process_new_data(self, data):
         new_data = np.asarray(data, dtype=object)[
@@ -210,7 +224,18 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         new_data = np.vstack(new_data).T / 1000
         if self.idx + new_data.shape[0] > self.data_len:
             self.idx = 0
-            self.y_plot = np.full([self.data_len, 2], np.nan)
+            self.y_plot = np.full([self.data_len, 3], np.nan)
+        # Check if a stim happened
+        if not self.stim_collecting_data and np.min(new_data[:,2]) < 0:
+            self.stim_ts = time.time()
+            # Modify timestamp by index of first sample that went below 0
+            sign_changes = np.where(np.sign(new_data[:-1,2]) != np.sign(new_data[1:,2]))[0] + 1
+            samples_behind = new_data.shape[0] - sign_changes[0]
+            print(samples_behind)
+            self.stim_ts -= (samples_behind / self.emg_sample_rate)
+            print(self.stim_ts, time.time())
+            self.stim_collecting_data = True
+
         self.y_plot[self.idx : self.idx + new_data.shape[0], :] = new_data
         self.frozen_data.extend(new_data.tolist())
         self.idx += new_data.shape[0] + 1
@@ -251,5 +276,5 @@ if __name__ == "__main__":
     # timer.start(5)
     timer2 = pg.QtCore.QTimer()
     timer2.timeout.connect(thisapp._update_plot)
-    timer2.start(40)
+    timer2.start(30)
     sys.exit(app.exec_())

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file '.\tms_window.ui'
+# Form implementation generated from reading ui file 'tms_window.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.4
 #
@@ -88,6 +88,7 @@ class Ui_MainWindow(object):
         self.channel_combo.setObjectName("channel_combo")
         self.channel_combo.addItem("")
         self.channel_combo.addItem("")
+        self.channel_combo.addItem("")
         self.gridLayout_2.addWidget(self.channel_combo, 0, 0, 1, 1)
         self.data_start_btn = QtWidgets.QPushButton(self.centralwidget)
         font = QtGui.QFont()
@@ -100,6 +101,18 @@ class Ui_MainWindow(object):
         self.canvas_layout = QtWidgets.QVBoxLayout()
         self.canvas_layout.setObjectName("canvas_layout")
         self.verticalLayout.addLayout(self.canvas_layout)
+        self.horizontalLayout = QtWidgets.QHBoxLayout()
+        self.horizontalLayout.setObjectName("horizontalLayout")
+        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout.addItem(spacerItem1)
+        self.label_2 = QtWidgets.QLabel(self.centralwidget)
+        self.label_2.setObjectName("label_2")
+        self.horizontalLayout.addWidget(self.label_2)
+        self.ppvoltage_label = QtWidgets.QLabel(self.centralwidget)
+        self.ppvoltage_label.setText("")
+        self.ppvoltage_label.setObjectName("ppvoltage_label")
+        self.horizontalLayout.addWidget(self.ppvoltage_label)
+        self.verticalLayout.addLayout(self.horizontalLayout)
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
         self.fps_label = QtWidgets.QLabel(self.centralwidget)
@@ -112,7 +125,7 @@ class Ui_MainWindow(object):
         self.verticalLayout.addLayout(self.horizontalLayout_2)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1097, 26))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1097, 21))
         self.menubar.setObjectName("menubar")
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
@@ -135,5 +148,17 @@ class Ui_MainWindow(object):
         self.browse_btn.setText(_translate("MainWindow", "Browse"))
         self.channel_combo.setItemText(0, _translate("MainWindow", "Channel 1"))
         self.channel_combo.setItemText(1, _translate("MainWindow", "Channel 2"))
+        self.channel_combo.setItemText(2, _translate("MainWindow", "TMS Stim"))
         self.data_start_btn.setText(_translate("MainWindow", "Start saving data"))
+        self.label_2.setText(_translate("MainWindow", "Peak to peak voltage (uV):"))
         self.aux_sync_btn.setText(_translate("MainWindow", "Sync Signal"))
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    MainWindow = QtWidgets.QMainWindow()
+    ui = Ui_MainWindow()
+    ui.setupUi(MainWindow)
+    MainWindow.show()
+    sys.exit(app.exec_())
