@@ -105,8 +105,8 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.stim_collecting_data = False
         t1 = threading.Thread(target=self.initialize_delsys)
         t1.start()
-        t2 = threading.Thread(target=self.collect_stim_data)
-        t2.start()
+        # t2 = threading.Thread(target=self.collect_stim_data)
+        # t2.start()
     
     def initialize_delsys(self):
         self.connect()
@@ -198,10 +198,15 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
                     )
                 )
                 if "EMG" in selectedSensor.TrignoChannels[channel].Name or "Analog A" in selectedSensor.TrignoChannels[channel].Name:
+                    if "EMG" in selectedSensor.TrignoChannels[channel].Name:
+                        self.channel_combo.addItem(f"Channel {len(self.dataStreamIdx) + 1}")
+                    else:
+                        self.channel_combo.addItem(f"TMS Stim")
                     self.dataStreamIdx.append(idxVal)
                 idxVal += 1
         print(self.dataStreamIdx)
-
+        self.num_channels = len(self.dataStreamIdx)
+        self.channel_combo.setCurrentIndex(0)
         t1 = threading.Thread(target=self.streaming)
         t1.start()
 
@@ -225,19 +230,27 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         if self.idx + new_data.shape[0] > self.data_len:
             self.idx = 0
             self.y_plot = np.full([self.data_len, 3], np.nan)
+
+        if self.stim_collecting_data:
+            missing_elements = self.frozen_data.maxlen - len(self.frozen_data)
+            if missing_elements > 0:
+                self.frozen_data.extend(new_data[:missing_elements,:].tolist())
+            if len(self.frozen_data) == self.frozen_data.maxlen:
+                self.stim_collecting_data = False
+                self.sync_signal()
+
         # Check if a stim happened
         if not self.stim_collecting_data and np.min(new_data[:,2]) < 0:
             self.stim_ts = time.time()
             # Modify timestamp by index of first sample that went below 0
             sign_changes = np.where(np.sign(new_data[:-1,2]) != np.sign(new_data[1:,2]))[0] + 1
-            samples_behind = new_data.shape[0] - sign_changes[0]
-            print(samples_behind)
-            self.stim_ts -= (samples_behind / self.emg_sample_rate)
-            print(self.stim_ts, time.time())
+            self.frozen_data = deque(maxlen=self.frozen_data_len)
+            self.frozen_data.extend(new_data[sign_changes[0]:,:].tolist())
             self.stim_collecting_data = True
+        
 
         self.y_plot[self.idx : self.idx + new_data.shape[0], :] = new_data
-        self.frozen_data.extend(new_data.tolist())
+        # self.frozen_data.extend(new_data.tolist())
         self.idx += new_data.shape[0] + 1
 
         if self.is_saving_data:

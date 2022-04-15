@@ -145,21 +145,6 @@
           <pointsize>11</pointsize>
          </font>
         </property>
-        <item>
-         <property name="text">
-          <string>Channel 1</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>Channel 2</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>TMS Stim</string>
-         </property>
-        </item>
        </widget>
       </item>
       <item row="0" column="1">
