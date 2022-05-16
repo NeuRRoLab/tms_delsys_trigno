@@ -1,5 +1,5 @@
-Pyside2
-Vispy
-Scipy
-pythonnet
-numpy
+pythonnet==2.5.2
+numpy==1.22.3
+pyqtgraph==0.12.4
+PyQt5==5.15.4
+pyqt5-tools==5.15.4.3.2
