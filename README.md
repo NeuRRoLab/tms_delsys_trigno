@@ -54,6 +54,26 @@ python tms_trigno.py
 
 Make sure that the `python` version is 3.8 and that it has all the necessary packages installed.
 
+### Modifying the GUI
+
+The GUI was built using the [QT designer](https://doc.qt.io/qt-5/qtdesigner-manual.html). To modify it, we can open the designer which should have been installed as part of the requirements of the project. To open the interface, we must do:
+
+```bash
+# Go to wherever the python base directory for the interpreter we're using is.
+# In the case of anaconda, it will be: 
+cd C:\Users\[USER]\anaconda3\envs\[ENV_NAME]
+# Then, open the designer
+cd Lib\site-packages\qt5_applications\Qt\bin\
+designer.exe
+```
+Inside the designer, open the QT file, available at [QT/tms_window.ui].
+
+When all changes are ready, update the Python file from the designer file by doing:
+
+```bash
+pyuic5 -o QT/main_window.py QT/tms_window.ui
+```
+
 ## Known issues and future work
 
 Getting a constant frame rate from the GUI is challenging. Right now, it is based on a QT timer that runs every 30ms. However, we discovered that if we don't print the time it takes for the plot update method to run, then the GUI as a whole slows down. Some digging will need to be done to avoid the printing while maintaining the frame rate.

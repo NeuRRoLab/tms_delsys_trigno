@@ -146,13 +146,3 @@ class Ui_MainWindow(object):
         self.data_start_btn.setText(_translate("MainWindow", "Start saving data"))
         self.label_2.setText(_translate("MainWindow", "Peak to peak voltage (uV):"))
         self.aux_sync_btn.setText(_translate("MainWindow", "Sync Signal"))
-
-
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    MainWindow = QtWidgets.QMainWindow()
-    ui = Ui_MainWindow()
-    ui.setupUi(MainWindow)
-    MainWindow.show()
-    sys.exit(app.exec_())
