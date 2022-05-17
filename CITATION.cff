@@ -5,7 +5,7 @@ authors:
   given-names: "Luis Hernan"
   orcid: "https://orcid.org/0000-0001-9876-6204"
 - family-names: "Krishnan"
-  given-names: "Chandramouli Krishnan"
+  given-names: "Chandramouli"
   orcid: "https://orcid.org/0000-0002-7278-7389"
 title: "A GUI for streaming and recording motor evoked potentials elicited by transcranial magnetic stimulation using the Delsys Trigno Lite EMG system"
 version: 1.0
