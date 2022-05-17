@@ -6,6 +6,12 @@ The gif below shows the usual function of the GUI. The left panel shows 10 secon
 
 ![](img/gif_tms.gif)
 
+## Citation
+
+If you use this software, please cite it as below.
+
+Cubillos, L. H., & Krishnan, C. (2022). A GUI for streaming and recording motor evoked potentials elicited by transcranial magnetic stimulation using the Delsys Trigno Lite EMG system (Version 1.0) [Computer software]. https://github.com/NeuRRoLab/tms_delsys_trigno
+
 ## Software and Hardware requirements
 
 The project was extensively tested using Python 3.8 and Windows 10. The specific python packages required are shown in the file [requirements.txt](requirements.txt). It uses the Delsys API, but no other packages should need to be installed: this can run as a standalone program. The necessary libraries are included in the folder `lib`.
@@ -77,6 +83,10 @@ pyuic5 -o QT/main_window.py QT/tms_window.ui
 ## Known issues and future work
 
 Getting a constant frame rate from the GUI is challenging. Right now, it is based on a QT timer that runs every 30ms. However, we discovered that if we don't print the time it takes for the plot update method to run, then the GUI as a whole slows down. Some digging will need to be done to avoid the printing while maintaining the frame rate.
+
+## Contact
+
+If you have any issues, please create a new issue in the repository, or contact Luis Cubillos at lhcubill@umich.edu.
 
 ## License
 
