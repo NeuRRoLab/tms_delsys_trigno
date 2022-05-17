@@ -78,4 +78,6 @@ pyuic5 -o QT/main_window.py QT/tms_window.ui
 
 Getting a constant frame rate from the GUI is challenging. Right now, it is based on a QT timer that runs every 30ms. However, we discovered that if we don't print the time it takes for the plot update method to run, then the GUI as a whole slows down. Some digging will need to be done to avoid the printing while maintaining the frame rate.
 
+## License
 
+See the [License.md](License.md) file for license rights and limitations (MIT).
