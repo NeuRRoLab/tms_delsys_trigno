@@ -4,13 +4,12 @@ import sys
 import threading
 import time
 from collections import deque
-from concurrent.futures import thread
 from datetime import datetime
 
 import clr
 import numpy as np
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtWidgets
+from pyqtgraph.Qt import QtWidgets
 
 clr.AddReference("lib/DelsysAPI")
 clr.AddReference("System.Collections")
@@ -193,6 +192,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.nameList = self.base.ListSensorNames()
         self.sensors_found = len(self.nameList)
         if self.sensors_found == 0:
+            self.pauseFlag = True
             sys.exit("No sensors found")
 
         # Connect to found sensors
@@ -339,7 +339,7 @@ if __name__ == "__main__":
     timer = pg.QtCore.QTimer()
     # Updates the plot at a 'fixed' frequency
     timer.timeout.connect(thisapp._update_plot)
-    interval = 35  # ms
+    interval = 30  # ms
     timer.setInterval(interval)
     timer.start()
     sys.exit(app.exec_())
