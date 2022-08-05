@@ -46,9 +46,11 @@ Finally, to make the system work properly, we need to copy the key and license f
 
 ## Usage
 
-To run the program, make sure that the sensors we want to use are already out of the base station and connected to it. Then, the program starts by running the following:
+To run the program, make sure that the sensors we want to use are already out of the base station and connected to it. Then, the program starts by opening the Anaconda Powershell and running the following:
 
 ```bash
+# Activate anaconda environment
+conda activate newdelsys
 python tms_trigno.py
 ```
 

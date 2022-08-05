@@ -23,6 +23,8 @@ from System.Collections.Generic import List
 from AeroPy.DataManager import DataKernel
 from QT.main_window import Ui_MainWindow
 
+exception_happened = False
+
 # Read license and key
 with open("config/key", mode="r", encoding="utf-8-sig") as key_file:
     key = key_file.read()
@@ -42,6 +44,8 @@ def timer(func):
 
     @functools.wraps(func)
     def wrapper_timer(*args, **kwargs):
+        if exception_happened:
+            return
         tic = time.perf_counter()
         value = func(*args, **kwargs)
         toc = time.perf_counter()
@@ -184,7 +188,11 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def connect(self):
         """Validates the Trigno Lite base using the license and key"""
-        self.base.ValidateBase(key, license, "RF")
+        try:
+            self.base.ValidateBase(key, license, "RF")
+        finally:
+            global exception_happened
+            exception_happened = True
 
     def scan(self):
         """Scans for available sensors"""
