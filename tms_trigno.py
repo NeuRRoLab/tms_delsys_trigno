@@ -190,9 +190,10 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         """Validates the Trigno Lite base using the license and key"""
         try:
             self.base.ValidateBase(key, license, "RF")
-        finally:
+        except Exception as e:
             global exception_happened
             exception_happened = True
+            
 
     def scan(self):
         """Scans for available sensors"""
