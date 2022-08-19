@@ -78,7 +78,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.live_plot = self.live_plot_itm.plot(pen="y")
         self.live_plot_itm.setLabel("bottom", "Time", "s")
         self.live_plot_itm.setLabel("left", "Voltage", "V")
-        self.live_plot_itm.setYRange(-0.003, 0.003, padding=0)
+        self.live_plot_itm.setYRange(-5.3, 5.3, padding=0)
         self.live_plot_itm.showGrid(x=True, y=True)
         # Freeze plot (right)
         self.freeze_plot_itm = self.canvas.addPlot()
@@ -193,7 +193,6 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         except Exception as e:
             global exception_happened
             exception_happened = True
-            
 
     def scan(self):
         """Scans for available sensors"""
@@ -222,11 +221,20 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         index = List[Int32]()
         self.base.ClearSensorList()
 
+        modes = [
+            "EMG raw (1926 Hz), skin check (74 Hz), ACC 2g (74 Hz), +/-22mv, 20-450Hz",
+            "EMG raw (1926 Hz), skin check (74 Hz), ACC 2g (74 Hz), +/-22mv, 20-450Hz",
+            "SIG raw x4 (1926 Hz-148Hz), Low Bandwidth",
+        ]
+
         for i in range(self.sensors_found):
             selectedSensor = self.base.GetSensorObject(i)
+            self.base.SetSampleMode(i, modes[i])
             self.base.AddSensortoList(selectedSensor)
             index.Add(i)
 
+        # curMode = self.base.GetSampleMode()
+        # print(curMode)
         self.sampleRates = [[] for i in range(self.sensors_found)]
         # Start streaming the data from the sensors
         self.base.StreamData(index, newTransform, 2)
@@ -260,6 +268,8 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
                 idxVal += 1
         self.num_channels = len(self.dataStreamIdx)
         self.channel_combo.setCurrentIndex(0)
+        print("Sample rates")
+        print(self.sampleRates)
         # Start consuming data
         t1 = threading.Thread(target=self.streaming)
         t1.start()
@@ -277,7 +287,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         """
         # Convert to array to facilitate indexing the useful data
         new_data = np.asarray(data, dtype=object)[tuple([self.dataStreamIdx])]
-        new_data = np.vstack(new_data).T / 1000
+        new_data = np.vstack(new_data).T / 1000 * 454.545
         # If we reached the limit on the left plot, reset index
         if self.idx + new_data.shape[0] > self.data_len:
             self.idx = 0
