@@ -395,7 +395,6 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         if not self.stim_collecting_data and check == True:
             self.stim_ts = time.time()
             tmp = new_data[:,2] - np.abs(self.thresh)
-            print(tmp.shape)
             # Modify timestamp by index of first sample that went below threshold
             if self.signalType.currentText() == "Rising":
                 sign_changes = (
@@ -405,7 +404,6 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
                 sign_changes = (
                     np.where((np.sign(tmp[:-1]) != np.sign(tmp[1:])) & ((tmp[:-1]) > (tmp[1:])))[0] + 1
                 ) 
-            print(sign_changes.shape)
             self.frozen_data = deque(maxlen=self.frozen_data_len)
             try:
                 self.frozen_data.extend(new_data[sign_changes[0]:, :].tolist())
