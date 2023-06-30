@@ -229,7 +229,7 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle(_translate("MainWindow", "TMS"))
         self.folder_in.setText(_translate("MainWindow", "results"))
         self.label.setText(_translate("MainWindow", "Patient Code"))
-        self.threshold.setText(_translate("MainWindow", "0.0"))
+        self.threshold.setText(_translate("MainWindow", "1.0"))
         self.pat_code_in.setText(_translate("MainWindow", "AB123456"))
         self.threshold_label.setText(_translate("MainWindow", "Threshold:"))
         self.label_4.setText(_translate("MainWindow", "Side tested"))
