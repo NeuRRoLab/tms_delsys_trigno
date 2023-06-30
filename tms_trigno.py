@@ -123,6 +123,9 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.frozen_data_len = int(
             round(self.emg_sample_rate * (milliseconds_frozen + offset) / 1000)
         )
+        self.freezeEndFrame = int(round(self.emg_sample_rate * self.freezeEndFrame / 1000))
+        self.freezeStartFrame = int(round(self.emg_sample_rate * self.freezeStartFrame / 1000))
+
         self.frozen_data = deque(maxlen=self.frozen_data_len)
         self.frozen_x = (
             np.linspace(self.freezeStartFrame, self.frozen_data_len - 1, self.frozen_data_len)
@@ -387,15 +390,19 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # Check if a stim happened
         if not self.stim_collecting_data and check == True:
+            print("Q")
             self.stim_ts = time.time()
-            tmp = new_data[:,2] - abs(self.thresh)
+            tmp = new_data[:,2] - np.abs(self.thresh)
             # Modify timestamp by index of first sample that went below threshold
             sign_changes = (
                 np.where(np.sign(tmp[:-1, 2]) != np.sign(tmp[1:, 2]))[0] + 1
             )
+            print(sign_changes.shape)
             self.frozen_data = deque(maxlen=self.frozen_data_len)
+            print("Y")
             if self.signalType.currentText() == "Rising":
-                self.frozen_data.extend(new_data[sign_changes[0] :, :].tolist())
+                self.frozen_data.extend(new_data[ self.freezeStartFrame + sign_changes[0] : sign_changes[0] + self.freezeEndFrame, :].tolist())
+                print("H")
             else:
                 self.frozen_data.extend(new_data[sign_changes[-1] :, :].tolist())
             self.stim_collecting_data = True
