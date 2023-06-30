@@ -120,7 +120,11 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         # Whether threshold is user set
         self.setThresh = False
         self.thresholdCanChange = True
+        # Whether frames are user set
+        self.setFrame = False
+        self.framesCanChange = True
 
+        self.console_msg.setText("Console: Set threshold and frames BEFORE scanning.")
 
         self.counter = 0
         self.fps = 0.0
@@ -137,28 +141,33 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
     def get_freeze(self):
 
 
-        self.setFreeze = True
-        self.console_msg.setText("Console: Freeze Frames set.")
-        self.freezeStartFrame = float(self.freezeBegin.text())
-        self.freezeEndFrame = float(self.freezeEnd.text())
+        if self.framesCanChange == True:
+            self.console_msg.setText("Console: Freeze Frames set.")
 
-        milliseconds_frozen = self.freezeEndFrame
-        self.freeze_plot_itm.setXRange(0,self.freezeEndFrame, padding = 0)
+            self.freezeStartFrame = float(self.freezeBegin.text())
+            self.freezeEndFrame = float(self.freezeEnd.text())
 
-        self.frozen_data_len = int(
-            round(self.emg_sample_rate * ((milliseconds_frozen)/1000))
-        )
+            milliseconds_frozen = self.freezeEndFrame
+            self.freeze_plot_itm.setXRange(0,self.freezeEndFrame, padding = 0)
 
-        self.frozen_data = deque(maxlen=self.frozen_data_len)
-        self.frozen_x = (
-            np.linspace(0, self.frozen_data_len - 1, self.frozen_data_len)
-            / self.emg_sample_rate
-            * 1000
-        )  # ms
+            self.frozen_data_len = int(
+                round(self.emg_sample_rate * ((milliseconds_frozen)/1000))
+            )
+
+            self.frozen_data = deque(maxlen=self.frozen_data_len)
+            self.frozen_x = (
+                np.linspace(0, self.frozen_data_len - 1, self.frozen_data_len)
+                / self.emg_sample_rate
+                * 1000
+            )  # ms
+            
+            # X axis represents time, and its spacing depends on the sample rate
+            self.x = np.linspace(0, self.data_len - 1, self.data_len) / self.emg_sample_rate
+            self.y_plot = np.full([self.data_len, 3], np.nan)
+        else:
+            self.console_msg.setText("Console: Frames cannot be changed after sensors are connected.")
         
-        # X axis represents time, and its spacing depends on the sample rate
-        self.x = np.linspace(0, self.data_len - 1, self.data_len) / self.emg_sample_rate
-        self.y_plot = np.full([self.data_len, 3], np.nan)
+        
 
     def get_thresh(self):
         self.setThresh = True
@@ -192,14 +201,15 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
             # disable threshold change
             self.threshold.setEnabled(False)
             self.thresholdCanChange = False
-            
+            self.freezeOK.setEnable(False)
+            self.framesCanChange = False
             # Disable scanning again
             self.scan_btn.setEnabled(False)
 
         except:
             #self.scan_error()
             print("Sensors were not connected")
-            self.console_msg.setText("Console: Could not connect")
+            self.console_msg.setText("Console: Could not connect. Restart application.")
             self.scan_btn.setEnabled(False)
             self.started_streaming = False
 
