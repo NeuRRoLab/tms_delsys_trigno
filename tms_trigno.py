@@ -109,30 +109,6 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         seconds_to_capture = 10
         self.data_len = int(round(self.emg_sample_rate * seconds_to_capture))
 
-        # Whether freeze frames are user set
-        self.setFreeze = False
-
-        if self.setFreeze == False:
-            self.freezeEndFrame = 150
-            self.freezeStartFrame = -50
-
-        milliseconds_frozen = self.freezeEndFrame - self.freezeStartFrame
-
-        self.frozen_data_len = int(
-            round(self.emg_sample_rate * (milliseconds_frozen) / 1000)
-        ) - 1
-        self.freezeEndFrame = int(round(self.emg_sample_rate * self.freezeEndFrame / 1000))
-        self.freezeStartFrame = int(round(self.emg_sample_rate * self.freezeStartFrame / 1000))
-
-        self.frozen_data = deque(maxlen=self.frozen_data_len)
-        self.frozen_x = (
-            np.linspace(self.freezeStartFrame, self.frozen_data_len - 1, self.frozen_data_len)
-            / self.emg_sample_rate
-            * 1000
-        )  # ms
-        # X axis represents time, and its spacing depends on the sample rate
-        self.x = np.linspace(0, self.data_len - 1, self.data_len) / self.emg_sample_rate
-        self.y_plot = np.full([self.data_len, 3], np.nan)
         # Whether we are saving data right now or not
         self.is_saving_data = False
         self.saving_data_path = None
@@ -159,11 +135,30 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.stim_collecting_data = False
 
     def get_freeze(self):
+
+
         self.setFreeze = True
         self.console_msg.setText("Console: Freeze Frames set.")
         self.freezeStartFrame = float(self.freezeBegin.text())
         self.freezeEndFrame = float(self.freezeEnd.text())
-        self.freeze_plot_itm.setXRange(self.freezeStartFrame, self.freezeEndFrame, padding = 0)
+
+        milliseconds_frozen = self.freezeEndFrame
+        self.freeze_plot_itm.setXRange(0,self.freezeEndFrame, padding = 0)
+
+        self.frozen_data_len = int(
+            round(self.emg_sample_rate * ((milliseconds_frozen)/1000))
+        )
+
+        self.frozen_data = deque(maxlen=self.frozen_data_len)
+        self.frozen_x = (
+            np.linspace(0, self.frozen_data_len - 1, self.frozen_data_len)
+            / self.emg_sample_rate
+            * 1000
+        )  # ms
+        
+        # X axis represents time, and its spacing depends on the sample rate
+        self.x = np.linspace(0, self.data_len - 1, self.data_len) / self.emg_sample_rate
+        self.y_plot = np.full([self.data_len, 3], np.nan)
 
     def get_thresh(self):
         self.setThresh = True
@@ -217,7 +212,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def sync_signal(self):
         """Runs when there is a detected TMS sync signal. Sets the data for the frozen (right) plot"""
-        frozen_values = np.array(self.frozen_data.copy())[self.frozen_data_len]
+        frozen_values = np.array(self.frozen_data.copy())
         self.freeze_plot.setData(self.frozen_x, frozen_values[:, self.selected_channel])
         ppvoltage = (
             np.max(frozen_values[:, self.selected_channel])
@@ -392,22 +387,23 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
             tmp = new_data[:,2] - np.abs(self.thresh)
             print(tmp.shape)
             # Modify timestamp by index of first sample that went below threshold
-            sign_changes = (
-                np.where(np.sign(tmp[:-1]) != np.sign(tmp[1:]))[0] + 1
-            )
+            if self.signalType.currentText() == "Rising":
+                sign_changes = (
+                    np.where((np.sign(tmp[:-1]) != np.sign(tmp[1:])) & ((tmp[:-1]) < (tmp[1:])))[0] + 1
+                ) 
+            else:
+                sign_changes = (
+                    np.where((np.sign(tmp[:-1]) != np.sign(tmp[1:])) & ((tmp[:-1]) > (tmp[1:])))[0] + 1
+                ) 
             print(sign_changes.shape)
             self.frozen_data = deque(maxlen=self.frozen_data_len)
-            print("Y")
             try:
-                if self.signalType.currentText() == "Rising":
-                    self.frozen_data.extend(new_data[ self.freezeStartFrame + sign_changes[0] : sign_changes[0] + self.freezeEndFrame, :].tolist())
-                    print("H")
-                else:
-                    self.frozen_data.extend(new_data[sign_changes[-1] :, :].tolist())
+                self.frozen_data.extend(new_data[sign_changes[0]:, :].tolist())
+                
                 self.stim_collecting_data = True
             except:
-                print("yo")
                 self.console_msg.setText("Preparing sensors")
+                
 
         self.y_plot[self.idx : self.idx + new_data.shape[0], :] = new_data
         # Add one to the left plot idx
