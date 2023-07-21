@@ -8,11 +8,8 @@ from datetime import datetime
 
 import clr
 import numpy as np
-from PyQt5 import QtWidgets
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
-
-from os.path import expanduser
 
 clr.AddReference("lib/DelsysAPI")
 clr.AddReference("System.Collections")
@@ -58,6 +55,7 @@ def timer(func):
 
     return wrapper_timer
 
+
 class App(QtWidgets.QMainWindow, Ui_MainWindow):
     """App that manages both the GUI and the streaming of data"""
 
@@ -74,14 +72,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.browse_btn.clicked.connect(self.choose_folder)
         self.data_start_btn.clicked.connect(self.start_collection)
         self.channel_combo.currentIndexChanged.connect(self.change_channel)
-
-        try:
-            self.aux_sync_btn.clicked.connect(self.sync_signal)
-        except:
-            self.console_msg.setText("Console: Could not sync.")
-
-        self.scan_btn.setEnabled(False)
-        self.scan_btn.clicked.connect(self.scan_sensors)
+        self.aux_sync_btn.clicked.connect(self.sync_signal)
         # Live plot (left)
         self.live_plot_itm = self.canvas.addPlot()
         self.live_plot = self.live_plot_itm.plot(pen="y")
@@ -97,19 +88,24 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.freeze_plot_itm.setLabel("left", "Voltage", "V")
         self.ppvoltage_label.setText(f"0.0")
 
-        # Get Threshold
-        self.threshold_btn.clicked.connect(self.get_thresh)
-
-        # Get freeze bounds
-        self.freezeOK.clicked.connect(self.get_freeze)
-
         #### Set Data  #####################
         # TODO: modify sample rate according to application
-        
         self.emg_sample_rate = 1925.9259033203125
         seconds_to_capture = 10
         self.data_len = int(round(self.emg_sample_rate * seconds_to_capture))
-
+        milliseconds_frozen = 100
+        self.frozen_data_len = int(
+            round(self.emg_sample_rate * milliseconds_frozen / 1000)
+        )
+        self.frozen_data = deque(maxlen=self.frozen_data_len)
+        self.frozen_x = (
+            np.linspace(0, self.frozen_data_len - 1, self.frozen_data_len)
+            / self.emg_sample_rate
+            * 1000
+        )  # ms
+        # X axis represents time, and its spacing depends on the sample rate
+        self.x = np.linspace(0, self.data_len - 1, self.data_len) / self.emg_sample_rate
+        self.y_plot = np.full([self.data_len, 3], np.nan)
         # Whether we are saving data right now or not
         self.is_saving_data = False
         self.saving_data_path = None
@@ -118,14 +114,6 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.idx = 0
         # Channel being shown
         self.selected_channel = 0
-        # Whether threshold is user set
-        self.setThresh = False
-        self.thresholdCanChange = True
-        # Whether frames are user set
-        self.setFrame = False
-        self.framesCanChange = True
-
-        self.console_msg.setText("Console: Set threshold and frames BEFORE scanning.")
 
         self.counter = 0
         self.fps = 0.0
@@ -138,95 +126,25 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pauseFlag = False
         self.stim_ts = 0
         self.stim_collecting_data = False
-
-    def get_freeze(self):
-
-
-        if self.framesCanChange == True:
-            self.console_msg.setText("Console: Freeze Frames set.")
-
-            self.setFrame = True
-
-            if self.setThresh == True:
-                self.scan_btn.setEnabled(True)
-            self.freezeStartFrame = float(self.freezeBegin.text())
-            self.freezeEndFrame = float(self.freezeEnd.text())
-
-            milliseconds_frozen = self.freezeEndFrame
-            self.freeze_plot_itm.setXRange(0,self.freezeEndFrame, padding = 0)
-
-            self.frozen_data_len = int(
-                round(self.emg_sample_rate * milliseconds_frozen/1000)
-            )
-
-            self.frozen_data = deque(maxlen=self.frozen_data_len)
-            self.frozen_x = (
-                np.linspace(0, self.frozen_data_len - 1, self.frozen_data_len)
-                / self.emg_sample_rate
-                * 1000
-            )  # ms
-            
-            # X axis represents time, and its spacing depends on the sample rate
-            self.x = np.linspace(0, self.data_len - 1, self.data_len) / self.emg_sample_rate
-            self.y_plot = np.full([self.data_len, 3], np.nan)
-        else:
-            self.console_msg.setText("Console: Frames cannot be changed after sensors are connected.")
-        
-        
-
-    def get_thresh(self):
-        self.setThresh = True
-        if self.setFrame == True:
-            self.scan_btn.setEnabled(True)
-
-        self.thresh = float(self.threshold.text())
-        if self.thresholdCanChange == True:
-            self.console_msg.setText("Console: Threshold set.")
-        else:
-            self.console_msg.setText("Console: Threshold cannot be changed after sensors are connected.")
-
-    def scan_sensors(self):
         # Initialize Delsys and start streaming
-        self.t1 = threading.Thread(target=self.initialize_delsys)
-        self.t1.start()
+        t1 = threading.Thread(target=self.initialize_delsys)
+        t1.start()
 
     def initialize_delsys(self):
         """Initializes Delsys and then starts streaming"""
-        self.console_msg.setText("Console: Scanning...")
-
-        try:
-            self.connect()
-            self.scan()
-            
-            self.console_msg.setText("Console: Connecting to sensors")
-
-             # Wait for it to connect and scan properly
-            time.sleep(4)
-            self.start_stream()
-            self.console_msg.setText("Console: Connected to sensors")
-            # Flag to establish that we started the streaming
-            self.started_streaming = True
-
-            # disable threshold change
-            self.threshold.setEnabled(False)
-            self.thresholdCanChange = False
-            self.freezeOK.setEnabled(False)
-            self.framesCanChange = False
-            # Disable scanning again
-            self.scan_btn.setEnabled(False)
-
-        except:
-        #     #self.scan_error()
-             print("Sensors were not connected")
-             self.console_msg.setText("Console: Could not connect. Restart application.")
-             self.scan_btn.setEnabled(False)
-             self.started_streaming = False
+        self.connect()
+        self.scan()
+        # Wait for it to connect and scan properly
+        time.sleep(2)
+        self.start_stream()
+        # Flag to establish that we started the streaming
+        self.started_streaming = True
 
     def choose_folder(self):
         """Choose folder dialog; runs when user clicks on the 'Browse' button."""
-        # dlog = QtWidgets.QFileDialog()
-        folder_path = QtWidgets.QFileDialog.getExistingDirectory(None, "Select Folder", expanduser("~"), options=QtWidgets.QFileDialog.DontUseNativeDialog)
-        # # Set the folder path in the GUI
+        dialog = QtWidgets.QFileDialog()
+        folder_path = dialog.getExistingDirectory(None, "Select Folder")
+        # Set the folder path in the GUI
         self.folder_in.setText(folder_path)
 
     def sync_signal(self):
@@ -245,17 +163,9 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
             now = datetime.now()
             self.saving_data_path = f"{self.folder_in.text()}/{self.pat_code_in.text()}_{self.side_combo.currentText()}_{now.strftime('%Y%m%d_%H%M%S')}.csv"
             os.makedirs(os.path.dirname(self.saving_data_path), exist_ok=True)
-            try:
-                self.file = open(self.saving_data_path, "w+", newline="")
-            except:
-                self.console_msg.setText("Console: Could not save. Set output directory.")
+            self.file = open(self.saving_data_path, "w+", newline="")
             self.writer = csv.writer(self.file)
-            
-            headers = []
-            for chan in range(self.sensors_found-1):
-                headers.append("chan_"+str(chan+1))
-            headers.append("stim")
-            self.writer.writerow(headers)
+            self.writer.writerow(["chan_1", "chan_2", "stim"])
             self.is_saving_data = True
 
             # Change color and text of button
@@ -291,7 +201,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.sensors_found = len(self.nameList)
         if self.sensors_found == 0:
             self.pauseFlag = True
-            # sys.exit("No sensors found")
+            sys.exit("No sensors found")
 
         # Connect to found sensors
         self.base.ConnectSensors()
@@ -350,10 +260,9 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
                     if "EMG" in selectedSensor.TrignoChannels[channel].Name:
                         # Add the corresponding text to the channel dropdown menu
                         self.channel_combo.addItem(
-                            f"Channel {len(self.dataStreamIdx)}"
+                            f"Channel {len(self.dataStreamIdx) + 1}"
                         )
                     else:
-                        self.tmsChannel = len(self.dataStreamIdx)
                         self.channel_combo.addItem(f"TMS Stim")
                     self.dataStreamIdx.append(idxVal)
                 idxVal += 1
@@ -362,8 +271,9 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         print("Sample rates")
         print(self.sampleRates)
         # Start consuming data
-        self.t1 = threading.Thread(target=self.streaming)
-        self.t1.start()
+        t1 = threading.Thread(target=self.streaming)
+        t1.start()
+        
 
     def stop_stream(self):
         """Stop the stream"""
@@ -378,7 +288,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         """
         # Convert to array to facilitate indexing the useful data
         new_data = np.asarray(data, dtype=object)[tuple([self.dataStreamIdx])]
-        new_data = (np.vstack(new_data).T / 1000 * 454.545)
+        new_data = np.vstack(new_data).T / 1000 * 454.545
         # If we reached the limit on the left plot, reset index
         if self.idx + new_data.shape[0] > self.data_len:
             self.idx = 0
@@ -395,33 +305,16 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.stim_collecting_data = False
                 self.sync_signal()
 
-        if self.setThresh == False:
-            self.thresh = 0.03
-            check = np.max(abs(new_data[:,self.tmsChannel])) > self.thresh     
-        else:
-            check = np.max(abs(new_data[:,self.tmsChannel])) > abs(self.thresh)
-
         # Check if a stim happened
-        if not self.stim_collecting_data and check == True:
+        if not self.stim_collecting_data and np.min(new_data[:, 0]) < 0:
             self.stim_ts = time.time()
-            tmp = abs(new_data[:,self.tmsChannel]) - np.abs(self.thresh)
-            # Modify timestamp by index of first sample that went below threshold
-            if self.signalType.currentText() == "Rising":
-                sign_changes = (
-                    np.where((np.sign(tmp[:-1]) != np.sign(tmp[1:])) & ((tmp[:-1]) < (tmp[1:])))[0] + 1
-                ) 
-            else:
-                sign_changes = (
-                    np.where((np.sign(tmp[:-1]) != np.sign(tmp[1:])) & ((tmp[:-1]) > (tmp[1:])))[0] + 1
-                ) 
+            # Modify timestamp by index of first sample that went below 0
+            sign_changes = (
+                np.where(np.sign(new_data[:-1, 0]) != np.sign(new_data[1:, 0]))[0] + 1
+            )
             self.frozen_data = deque(maxlen=self.frozen_data_len)
-            try:
-                self.frozen_data.extend(new_data[sign_changes[0]:, :].tolist())
-                
-                self.stim_collecting_data = True
-            except:
-                self.console_msg.setText("Preparing sensors")
-                
+            self.frozen_data.extend(new_data[sign_changes[0] :, :].tolist())
+            self.stim_collecting_data = True
 
         self.y_plot[self.idx : self.idx + new_data.shape[0], :] = new_data
         # Add one to the left plot idx
