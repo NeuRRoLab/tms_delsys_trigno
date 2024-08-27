@@ -131,7 +131,8 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         self.fps = 0.0
         self.initial_time = time.time()
         self.last_update = time.time()
-
+        self.channelcount = 0
+        self.pairnumber = 0
         # Configure Delsys
         self.sensors_found = 0
         self.started_streaming = False
@@ -287,14 +288,14 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
     def scan(self):
         """Scans for available sensors"""
         self.base.ScanSensors().Result
-        self.nameList = self.base.ListSensorNames()
+        self.nameList = self.base.GetSensorNames()
         self.sensors_found = len(self.nameList)
         if self.sensors_found == 0:
             self.pauseFlag = True
             # sys.exit("No sensors found")
 
         # Connect to found sensors
-        self.base.ConnectSensors()
+        self.base.SelectAllSensors()
 
     def streaming(self):
         """This is the data processing thread"""
@@ -327,7 +328,9 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         # print(curMode)
         self.sampleRates = [[] for i in range(self.sensors_found)]
         # Start streaming the data from the sensors
-        self.base.StreamData(index, newTransform, 2)
+        # self.base.StreamData(index, newTransform, 2)
+        self.base.Configure()
+        self.base.Start()
 
         self.dataStreamIdx = []
         idxVal = 0
@@ -342,10 +345,10 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
                     )
                 )
                 # EMG corresponds to an EMG channel
-                # Analog A corresponds to the Sync channel
+                # Analog 1 corresponds to the Sync channel
                 if (
                     "EMG" in selectedSensor.TrignoChannels[channel].Name
-                    or "Analog A" in selectedSensor.TrignoChannels[channel].Name
+                    or "Analog 1" in selectedSensor.TrignoChannels[channel].Name
                 ):
                     if "EMG" in selectedSensor.TrignoChannels[channel].Name:
                         # Add the corresponding text to the channel dropdown menu
@@ -367,7 +370,7 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def stop_stream(self):
         """Stop the stream"""
-        self.base.StopData()
+        self.base.Stop()
         self.pauseFlag = True
 
     def process_new_data(self, data):
@@ -456,6 +459,143 @@ class App(QtWidgets.QMainWindow, Ui_MainWindow):
         """Captures the window close event and stops the streaming"""
         if self.started_streaming:
             self.stop_stream()
+
+    def PipelineState_Callback(self):
+        return self.base.GetPipelineState()
+
+    def Connect_Callback(self):
+        """Callback to connect to the base"""
+        self.base.ValidateBase(key, license)
+
+    def Pair_Callback(self):
+        return self.base.PairSensor(self.pair_number)
+
+    def CheckPairStatus(self):
+        return self.base.CheckPairStatus()
+
+    def CheckPairComponentAdded(self):
+        return self.base.CheckPairComponentAdded()
+
+    def Scan_Callback(self):
+        """Callback to tell the base to scan for any available sensors"""
+        try:
+            f = self.base.ScanSensors().Result
+        except Exception as e:
+            print("Python demo attempt another scan...")
+            time.sleep(1)
+            self.Scan_Callback()
+
+        self.all_scanned_sensors = self.base.GetScannedSensorsFound()
+        print("Sensors Found:\n")
+        for sensor in self.all_scanned_sensors:
+            print("(" + str(sensor.PairNumber) + ") " +
+                sensor.FriendlyName + "\n" +
+                sensor.Configuration.ModeString + "\n")
+
+        self.SensorCount = len(self.all_scanned_sensors)
+        for i in range(self.SensorCount):
+            self.base.SelectSensor(i)
+
+        return self.all_scanned_sensors
+
+
+    def Start_Callback(self, start_trigger, stop_trigger):
+        """Callback to start the data stream from Sensors"""
+        self.start_trigger = start_trigger
+        self.stop_trigger = stop_trigger
+
+        configured = self.ConfigureCollectionOutput()
+        if configured:
+            #(Optional) To get YT data output pass 'True' to Start method
+            self.base.Start(self.collection_data_handler.streamYTData)
+            self.collection_data_handler.threadManager(self.start_trigger, self.stop_trigger)
+
+    def ConfigureCollectionOutput(self):
+        if not self.start_trigger:
+            self.collection_data_handler.pauseFlag = False
+
+        self.collection_data_handler.DataHandler.packetCount = 0
+        self.collection_data_handler.DataHandler.allcollectiondata = [[]]
+
+        # Pipeline Armed when TrigBase.Configure already called.
+        # This if block allows for sequential data streams without reconfiguring the pipeline each time.
+        # Reset output data structure before starting data stream again
+        if self.base.GetPipelineState() == 'Armed':
+            for i in range(len(self.channelobjects)):
+                self.collection_data_handler.DataHandler.allcollectiondata.append([])
+            return True
+
+
+        # Pipeline Connected when sensors have been scanned in sucessfully.
+        # Configure output data using TrigBase.Configure and pass args if you are using a start and/or stop trigger
+        elif self.base.GetPipelineState() == 'Connected':
+            self.channelcount = 0
+            self.base.Configure(self.start_trigger, self.stop_trigger)
+            configured = self.base.IsPipelineConfigured()
+            if configured:
+                self.channelobjects = []
+                self.plotCount = 0
+                self.emgChannelsIdx = []
+                globalChannelIdx = 0
+
+                for i in range(self.SensorCount):
+
+                    selectedSensor = self.base.GetSensorObject(i)
+                    print("(" + str(selectedSensor.PairNumber) + ") " + str(selectedSensor.FriendlyName))
+
+                    if len(selectedSensor.TrignoChannels) > 0:
+                        print("--Channels")
+
+                        for channel in range(len(selectedSensor.TrignoChannels)):
+                            sample_rate = round(selectedSensor.TrignoChannels[channel].SampleRate, 3)
+                            print("----" + selectedSensor.TrignoChannels[channel].Name + " (" + str(sample_rate) + " Hz)")
+                            self.channelcount += 1
+                            self.channelobjects.append(channel)
+                            self.collection_data_handler.DataHandler.allcollectiondata.append([])
+
+                            # NOTE: Plotting/Data Output: This demo does not plot non-EMG channel types such as
+                            # accelerometer, gyroscope, magnetometer, and others. However, the data from channels
+                            # that are excluded from plots are still available via output from PollData()
+
+                            # ---- Plot EMG Channels
+                            if "EMG" in selectedSensor.TrignoChannels[channel].Name:
+                                self.emgChannelsIdx.append(globalChannelIdx)
+                                self.plotCount += 1
+
+                            # ---- Exclude non-EMG channels from plots
+                            else:
+                                pass
+
+                            globalChannelIdx += 1
+
+                if self.collection_data_handler.EMGplot:
+                    self.collection_data_handler.EMGplot.initiateCanvas(None, None, self.plotCount, 1, 20000)
+
+                return True
+        else:
+            return False
+
+    def Stop_Callback(self):
+        """Callback to stop the data stream"""
+        self.collection_data_handler.pauseFlag = True
+        self.base.Stop()
+        print("Data Collection Complete")
+
+    # ---------------------------------------------------------------------------------
+    # ---- Helper Functions
+    def getSampleModes(self, sensorIdx):
+        """Gets the list of sample modes available for selected sensor"""
+        sampleModes = self.base.AvailibleSensorModes(sensorIdx)
+        return sampleModes
+
+    def getCurMode(self, sensorIdx):
+        """Gets the current mode of the sensors"""
+        curModes = self.base.GetCurrentSensorMode(sensorIdx)
+        return curModes
+
+    def setSampleMode(self, curSensor, setMode):
+        """Sets the sample mode for the selected sensor"""
+        self.base.SetSampleMode(curSensor, setMode)
 
 
 if __name__ == "__main__":
