@@ -1,0 +1,18 @@
+<License>
+  <Id>17cbdad2-eee4-4102-9f94-8d28bc800bb7</Id>
+  <Type>Standard</Type>
+  <Quantity>10</Quantity>
+  <LicenseAttributes>
+    <Attribute name="Software">VS2012</Attribute>
+  </LicenseAttributes>
+  <ProductFeatures>
+    <Feature name="Sales">True</Feature>
+    <Feature name="Billing">False</Feature>
+  </ProductFeatures>
+  <Customer>
+    <Name>Chandramouli Krishnan</Name>
+    <Email>moulli@med.umich.edu</Email>
+  </Customer>
+  <Expiration>Tue, 13 Apr 2032 04:00:00 GMT</Expiration>
+  <Signature>MEUCIEzOLEzZOtl5gukm66BQbmAO5ryRIgS1DjpBhr8o/VRMAiEA2uUnIO4hqseR2zfpn9YRM0CVRIiL3D6fVBodawxoDgY=</Signature>
+</License>
